@@ -1,0 +1,134 @@
+version: '3.8'
+
+services:
+  node_app:
+    deploy:
+      replicas: 1
+    image: node_app:latest
+    environment:
+      - PORT=3050
+      - MONGO_URL=mongodb://admin:admin@devops_database:27017/
+      - RABBITMQ_URL=amqp://admin:admin@devops_message_bus:5672
+    volumes:
+      - './node-app:/node-app'
+    ports:
+      - '3051:3050'
+    networks:
+      - app_network
+    depends_on:
+      - database
+
+  chat_app:
+    deploy:
+      replicas: 1
+    image: chat_app:latest
+    environment:
+      - PORT=3550
+      - MONGO_URL=mongodb://admin:admin@devops_chat_database:27017/
+      - RABBITMQ_URL=amqp://admin:admin@devops_message_bus:5672
+    volumes:
+      - './chat-app:/chat-app'
+    ports:
+      - '3551:3550'
+    networks:
+      - app_network
+    depends_on:
+      - chat_database
+      - message_bus
+
+  frontend:
+    deploy:
+      replicas: 1
+    image: frontend:latest
+    environment:
+      - NGINX_PORT=8050
+    ports:
+      - '8050:80'
+    networks:
+      - app_network
+    depends_on:
+      - node_app
+      - database
+
+  database:
+    deploy:
+      replicas: 1
+    image: mongo:latest
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin
+      MONGO_INITDB_DATABASE: devops_app
+    networks:
+      - app_network
+    volumes:
+      - database_data:/data/db
+
+  chat_database:
+    deploy:
+      replicas: 1
+    image: mongo:latest
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin
+      MONGO_INITDB_DATABASE: devops_chat
+    networks:
+      - app_network
+    volumes:
+      - chat_database_data:/data/db
+
+  database_exporter:
+    deploy:
+      replicas: 1
+    image: bitnami/mongodb-exporter
+    environment:
+      - MONGODB_URI=mongodb://admin:admin@devops_database:27017/
+    depends_on:
+      - database
+    networks:
+      - app_network
+
+  prometheus:
+    deploy:
+      replicas: 1
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    ports:
+      - '9090:9090'
+    networks:
+      - app_network
+    depends_on:
+      - node_app
+      - database_exporter
+    command: '--web.enable-lifecycle --config.file=/etc/prometheus/prometheus.yml'
+
+  grafana:
+    deploy:
+      replicas: 1
+    image: grafana:latest
+    ports:
+      - '3000:3000'
+    networks:
+      - app_network
+
+  message_bus:
+    deploy:
+      replicas: 1
+    image: rabbitmq:3-management
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    networks:
+      - app_network
+
+networks:
+  app_network:
+
+volumes:
+  database_data:
+  chat_database_data:
+  prometheus_data:
