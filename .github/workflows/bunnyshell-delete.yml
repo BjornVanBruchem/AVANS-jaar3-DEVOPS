@@ -23,4 +23,4 @@ jobs:
       allowed-users: "*"
       comment-on-pr: true
     secrets:
-      bunnyshell-access-token: ${{ secrets.BUNNYSHELL_API_KEY }}
+      bunnyshell-access-token: ${{ secrets.BUNNYSHELL_ACCESS_TOKEN }}
